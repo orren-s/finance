@@ -1,3 +1,4 @@
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from spacy.matcher import Matcher
 import pandas as pd
@@ -11,21 +12,36 @@ import spacy
 from collections import Counter
 import pandas_datareader as web
 import datetime
+from pandas.tseries.offsets import BDay
 
 start = '2018-01-01'
 today = datetime.datetime.today()
 
 # Scrape Motley Fool for Text data
 
-url = 'https://www.fool.com/earnings/call-transcripts/2020/01/28/apple-inc-aapl-q1-2020-earnings-call-transcript.aspx'
+# url = 'https://www.fool.com/earnings/call-transcripts/2020/01/28/apple-inc-aapl-q1-2020-earnings-call-transcript.aspx'
+url = 'https://www.fool.com/earnings/call-transcripts/2019/04/30/apple-inc-aapl-q2-2019-earnings-call-transcript.aspx'
+url = 'https://www.fool.com/earnings/call-transcripts/2019/07/30/apple-inc-aapl-q3-2019-earnings-call-transcript.aspx'
 
 source = requests.get(url).text
 soup = bs.BeautifulSoup(source, 'lxml')
 
 # Locate Article Content
 soup = soup.find('span', class_='article-content')
-date_of_call = datetime.datetime.strptime(soup.find('span',id='date').text, '%b %d, %Y')
-ticker = soup.find('span',class_='ticker').text.split(':')[1].replace(')','')
+
+try:
+    date_of_call = datetime.datetime.strptime(
+        soup.find('span', id='date').text, '%B %d, %Y')
+except ValueError:
+    date_of_call = datetime.datetime.strptime(
+        soup.find('span', id='date').text, '%b %d, %Y')
+
+
+ticker = soup.find('span', class_='ticker').text.split(':')[1].replace(')', '')
+
+Bdays_after_call_20 = date_of_call + BDay(20)
+Bdays_after_call_40 = date_of_call + BDay(40)
+Bdays_after_call_60 = date_of_call + BDay(60)
 
 # Get historical price data from Datareader
 price_df = web.DataReader(ticker, 'yahoo', start, today)
@@ -93,6 +109,7 @@ def preprocess_token(token):
     # Reduce token to its lowercase lemma form
     return token.lemma_.strip().lower()
 
+
 complete_filtered_tokens = [preprocess_token(token)
                             for token in doc1 if is_token_allowed(token)]
 
@@ -109,9 +126,26 @@ print(vectorizer.get_feature_names())
 tfidf_bow = vectorizer.get_feature_names()
 tfidf_bow
 
-
-
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
-
+# Run a quick sentiment analyzer for fun
 sid = SentimentIntensityAnalyzer()
 sid.polarity_scores(earnings_call)
+
+
+# Generate DataFrame of Features with indiv. Earnings Calls as observations in each row
+
+df = pd.DataFrame(index=[date_of_call])
+df['corpus'] = earnings_call
+df['tf_idf_words'] = [tfidf_bow]
+
+# Note: Days are business days
+df['% Return 20-Days After Call'] = price_df['Close'].loc[:
+                                                          Bdays_after_call_20].pct_change(20)[-1]
+df['20th Business Day After'] = price_df['Close'].loc[:Bdays_after_call_20].index[-1].date()
+
+df['% Return 40-Days After Call'] = price_df['Close'].loc[:
+                                                          Bdays_after_call_40].pct_change(40)[-1]
+df['40th Business Day After Call'] = price_df['Close'].loc[:Bdays_after_call_40].index[-1].date()
+
+df['% Return 60-Days After Call'] = price_df['Close'].loc[:
+                                                          Bdays_after_call_60].pct_change(60)[-1]
+df['60th Business Day After Call'] = price_df['Close'].loc[:Bdays_after_call_60].index[-1].date()
