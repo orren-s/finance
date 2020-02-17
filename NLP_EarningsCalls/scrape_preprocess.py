@@ -19,21 +19,6 @@ today = datetime.datetime.today()
 
 # Scrape Motley Fool for Text data
 
-# url = 'https://www.fool.com/earnings/call-transcripts/2020/01/28/apple-inc-aapl-q1-2020-earnings-call-transcript.aspx'
-# url = 'https://www.fool.com/earnings/call-transcripts/2019/04/30/apple-inc-aapl-q2-2019-earnings-call-transcript.aspx'
-# url = 'https://www.fool.com/earnings/call-transcripts/2019/07/30/apple-inc-aapl-q3-2019-earnings-call-transcript.aspx'
-# url = 'https://www.fool.com/earnings/call-transcripts/2019/11/08/yelp-inc-yelp-q3-2019-earnings-call-transcript.aspx'
-
-# url = 'https://www.fool.com/'
-# nextnew_urls = deque([url])
-
-
-urls = [
-    'https://www.fool.com/earnings/call-transcripts/2019/11/08/yelp-inc-yelp-q3-2019-earnings-call-transcript.aspx', 
-    'https://www.fool.com/earnings/call-transcripts/2019/07/30/apple-inc-aapl-q3-2019-earnings-call-transcript.aspx',
-    'https://www.fool.com/earnings/call-transcripts/2019/04/30/apple-inc-aapl-q2-2019-earnings-call-transcript.aspx',
-    'https://www.fool.com/earnings/call-transcripts/2020/01/28/apple-inc-aapl-q1-2020-earnings-call-transcript.aspx']
-
 def earnings_meta_data(url):
         
     source = requests.get(url).text
@@ -46,8 +31,12 @@ def earnings_meta_data(url):
         date_of_call = datetime.datetime.strptime(
             soup.find('span', id='date').text, '%B %d, %Y')
     except ValueError:
-        date_of_call = datetime.datetime.strptime(
-            soup.find('span', id='date').text, '%b %d, %Y')
+        try:
+            date_of_call = datetime.datetime.strptime(
+                soup.find('span', id='date').text, '%b %d, %Y')
+        except ValueError:
+            date_of_call = datetime.datetime.strptime(
+                soup.find('span', id='date').text, '%b. %d, %Y')
 
 
     ticker = soup.find('span', class_='ticker').text.split(':')[1].replace(')', '')
@@ -74,7 +63,10 @@ def earnings_meta_data(url):
     Bdays_after_call_60 = date_of_call + BDay(60)
 
     # Get historical price data from Datareader
-    price_df = web.DataReader(ticker, 'yahoo', start, today)
+    try:
+        price_df = web.DataReader(ticker, 'yahoo', start, today)
+    except KeyError:
+        print('Historical Data Unavailable for: ', ticker)
 
     # Scrape all <p> and combine them into one string
     earnings_call = []
@@ -220,13 +212,21 @@ def earnings_meta_data(url):
     return df
 
 
+# Read in csv that contains earnings call urls
+links = pd.read_csv('./data/earnings_links.csv', index_col=0)
+
+# Create empty dataframe to house dataframes generated in earnings_meta_data loop
 data = pd.DataFrame()
 
-for u in urls:
+# Loop over earnings_meta_data with the earnings transcript urls
+for u in links['earnings_links']:
 
-    temp = earnings_meta_data(url=u)
+    if 'RCL' in u:
+        pass
+    else:
+        temp = earnings_meta_data(url=u)
 
-    data = data.append(temp)
+        data = data.append(temp)
+        print(data)
 
-
-print(data)
+print('All done.')
