@@ -20,7 +20,8 @@ soup = bs.BeautifulSoup(source, 'lxml')
 
 # Locate Article Content
 soup = soup.find('span', class_='article-content')
-
+date_of_call = soup.find('span',id='date').text
+ticker = soup.find('span',class_='ticker').text.split(':')[1].replace(')','')
 
 # Scrape all <p> and combine them into one string
 earnings_call = []
