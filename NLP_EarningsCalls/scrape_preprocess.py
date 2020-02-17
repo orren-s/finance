@@ -9,7 +9,11 @@ import re
 import numpy as np
 import spacy
 from collections import Counter
+import pandas_datareader as web
+import datetime
 
+start = '2018-01-01'
+today = datetime.datetime.today()
 
 # Scrape Motley Fool for Text data
 
@@ -20,8 +24,11 @@ soup = bs.BeautifulSoup(source, 'lxml')
 
 # Locate Article Content
 soup = soup.find('span', class_='article-content')
-date_of_call = soup.find('span',id='date').text
+date_of_call = datetime.datetime.strptime(soup.find('span',id='date').text, '%b %d, %Y')
 ticker = soup.find('span',class_='ticker').text.split(':')[1].replace(')','')
+
+# Get historical price data from Datareader
+price_df = web.DataReader(ticker, 'yahoo', start, today)
 
 # Scrape all <p> and combine them into one string
 earnings_call = []
@@ -101,3 +108,10 @@ print(vectorizer.get_feature_names())
 
 tfidf_bow = vectorizer.get_feature_names()
 tfidf_bow
+
+
+
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+
+sid = SentimentIntensityAnalyzer()
+sid.polarity_scores(earnings_call)
