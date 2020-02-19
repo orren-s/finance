@@ -13,6 +13,7 @@ from collections import Counter
 import pandas_datareader as web
 import datetime
 from pandas.tseries.offsets import BDay
+import mlfinlab
 
 start = '2018-01-01'
 today = datetime.datetime.today()
@@ -219,7 +220,7 @@ links = pd.read_csv('./data/earnings_links.csv', index_col=0)
 data = pd.DataFrame()
 
 # Loop over earnings_meta_data with the earnings transcript urls
-for u in links['earnings_links']:
+for u in links['earnings_links'][:5]:
 
     if 'RCL' in u:
         pass
